@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:math';
 
@@ -34,11 +35,12 @@ class CardsView extends StatefulWidget {
 
 class CardsState extends State<CardsView> {
   final _flashcards = [
-    {'Question': '', 'Answer': ''},
+    {'Question': '', 'Answer': '', 'Image' : ''},
   ];
 
   bool _showAnswer = false;
   int _currentIndex = 0;
+  String _addr = "";
 
   void _toggleAnswer() => setState(() => _showAnswer = !_showAnswer);
 
@@ -53,32 +55,33 @@ class CardsState extends State<CardsView> {
   });
 
   void _openFile() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: false,
-      type: FileType.custom,
-      allowedExtensions: ['csv'],
-    );
-
+    if (Platform.isAndroid && await Permission.storage.request().isDenied) {
+      exit(1);
+    }
+    final result = await FilePicker.platform.getDirectoryPath(lockParentWindow: true);
     if (result != null) {
-      final path = result.files.first.path;
-      if (path != null) {
-        final csvString = await File(path).readAsString();
-        setState(() {
-          _flashcards.clear();
-          _flashcards.addAll(csvString.split('\n').where((line) => line.isNotEmpty).map((line) {
-            final fields = line.split(',');
-            fields[1] = fields[1].replaceAll("^n", "\n");
-            return {'Question': fields[0], 'Answer': fields[1]};
-          }));
-          _currentIndex = 0;
-        });
-      }
+      _addr = result;
+      final csvString = await File("$_addr/index.csv").readAsString();
+      setState(() {
+        _flashcards.clear();
+        _flashcards.addAll(csvString.split('\n').where((line) => line.isNotEmpty).map((line) {
+          final fields = line.split(',');
+          fields[1] = fields[1].replaceAll("^n", "\n");
+          final p = fields[1].split("^p");
+          if (p.length > 1) {
+            return {'Question': fields[0], 'Answer': p[0], 'Image' : p.last};
+          }
+          return {'Question': fields[0], 'Answer': fields[1]};
+        }));
+        _currentIndex = 0;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final cardText = _showAnswer ? _flashcards[_currentIndex]['Answer'] ?? "" : _flashcards[_currentIndex]['Question'] ?? "";
+    final answerImage = _showAnswer ? _flashcards[_currentIndex]['Image'] ?? "" : "";
 
     return Scaffold(
       appBar: AppBar(
@@ -91,20 +94,31 @@ class CardsState extends State<CardsView> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Flexible(
-                flex: 0,
-                child: SizedBox(
-                  width: MediaQuery.of(context).size.width > 200 ? MediaQuery.of(context).size.width : 200,
-                  child: GestureDetector(
-                    onTap: _toggleAnswer,
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Center(
-                          child: Text(
-                            cardText,
-                            style: TextStyle(fontSize: MediaQuery.of(context).textScaler.scale(16)),
-                          ),
+              SizedBox(
+                width: MediaQuery.of(context).size.width > 200 ? MediaQuery.of(context).size.width : 200,
+                height: 200,
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: answerImage.isNotEmpty
+                        ? Image.file(
+                        File("$_addr/$answerImage"),
+                        errorBuilder: (context, error, stackTrace) => const Text('Image not found'))
+                        : const Text(""),
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: MediaQuery.of(context).size.width > 200 ? MediaQuery.of(context).size.width : 200,
+                child: GestureDetector(
+                  onTap: _toggleAnswer,
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Center(
+                        child: Text(
+                          cardText,
+                          style: TextStyle(fontSize: MediaQuery.of(context).textScaler.scale(16)),
                         ),
                       ),
                     ),
