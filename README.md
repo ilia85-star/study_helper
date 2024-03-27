@@ -12,8 +12,8 @@ A flashcard application written in flutter.
 - [x] Multiline text in flashcards.
 - [x] bidi support. (Arabic, Persian and other RTL languages)
 - [x] Random card select.
-- [ ] Add AppIcon.
-- [ ] Image support.
+- [x] Add AppIcon.
+- [x] Image support.
 - [ ] Nerd font.
 - [ ] Improve UI (system default theme, tap effects & etc).
 - [ ] Built in database.
